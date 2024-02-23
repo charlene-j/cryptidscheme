@@ -1,16 +1,16 @@
 use rand_core::{CryptoRng, RngCore};
 use rand::Rng;
 use rand::distributions::{Distribution, Uniform};
-use curve25519_dalek::{ristretto::RistrettoPoint,scalar::Scalar,traits::Identity,constants::RISTRETTO_BASEPOINT_POINT};
+use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar, traits::Identity, constants::RISTRETTO_BASEPOINT_POINT};
 use sha256::digest;
 use hex::FromHex;
-use std::{time::Duration,time::Instant,io,io::Write,fs::File,fs};
+use std::{time::Duration, time::Instant, io, io::Write, fs::File, fs};
 
 //https://ristretto.group/why_ristretto.html
 //https://datatracker.ietf.org/meeting/109/materials/slides-109-cfrg-ristrettodecaf-00
 //we mainly use the library curve25519_dalek: https://docs.rs/curve25519-dalek/latest/curve25519_dalek/
 
-// Definition of structure for proofs
+// Definition of structure for the proof.
 #[derive(Debug)]
 pub enum Proof{
 
@@ -19,7 +19,7 @@ pub enum Proof{
     Error{err: bool},
 }
 
-// It generates a random scalar (given in the curve25519_dalek library)
+// It generates a random scalar (given in the curve25519_dalek library).
 fn random_scalar<T: CryptoRng + RngCore>(csprng: &mut T) -> Scalar{
 
     let mut scalar_bytes = [0u8; 32];
@@ -35,15 +35,15 @@ pub fn random_point<T: CryptoRng + RngCore>(csprng: & mut T) -> RistrettoPoint{
     return point
 }
 
-// It converts a [u8;32] in Scalar
-fn convert_scalar(a: [u8;32]) -> Scalar{
+// It converts a [u8; 32] in Scalar
+fn convert_scalar(a: [u8; 32]) -> Scalar{
     
     let s = Scalar::from_bytes_mod_order(a);
     return s
 }	       
 
 // It converts a RistrettoPoint in [u8;32]
-fn convert_ristretto(t: RistrettoPoint) -> [u8;32]{
+fn convert_ristretto(t: RistrettoPoint) -> [u8; 32]{
 
     let conv = t.compress();
     let conv2 = conv.to_bytes();
@@ -51,22 +51,22 @@ fn convert_ristretto(t: RistrettoPoint) -> [u8;32]{
 }
   
 // ElGamal Encryption/Decryption.
-fn gen_elgamal<T: CryptoRng + RngCore>(csprng: &mut T,g: RistrettoPoint) -> (RistrettoPoint,RistrettoPoint,Scalar){
+fn gen_elgamal<T: CryptoRng + RngCore>(csprng: &mut T, g: RistrettoPoint) -> (RistrettoPoint, RistrettoPoint, Scalar){
     
     let sk = random_scalar(csprng);
     let pk = sk * g;
-    return (g,pk,sk)
+    return (g, pk, sk)
 }
 	
-pub fn enc_elgamal<T: CryptoRng + RngCore>(csprng: &mut T,g: RistrettoPoint,pk: RistrettoPoint,m: RistrettoPoint)-> (RistrettoPoint,RistrettoPoint){ 
+pub fn enc_elgamal<T: CryptoRng + RngCore>(csprng: &mut T, g: RistrettoPoint, pk: RistrettoPoint, m: RistrettoPoint)-> (RistrettoPoint, RistrettoPoint){ 
 	
     let r = random_scalar(csprng);
     let c1 = r * g;
     let c2 = m + r * pk;
-    return (c1,c2)
+    return (c1, c2)
 }
 	
-fn dec_elgamal(sk: Scalar,c1: RistrettoPoint,c2: RistrettoPoint)-> RistrettoPoint{ 
+fn dec_elgamal(sk: Scalar, c1: RistrettoPoint, c2: RistrettoPoint)-> RistrettoPoint{ 
 
     let m = c2 - sk * c1 ;
     return m
@@ -75,17 +75,15 @@ fn dec_elgamal(sk: Scalar,c1: RistrettoPoint,c2: RistrettoPoint)-> RistrettoPoin
 // It hashes and concatenates a RistrettoPoint vector.
 fn hash_vec(input: Vec<RistrettoPoint>) -> Scalar{
 		
-    let mut k: Vec<[u8;32]> = Vec::new();
-		
+    let mut k: Vec<[u8; 32]> = Vec::new();	
     for p in input {
 	let p_p = convert_ristretto(p);
 	k.push(p_p);
     }
-
     let conc = k.concat();
     let h = digest(&conc); 
-    let v = <[u8;32]>::from_hex(h);
-    let mut u = [0u8;32];
+    let v = <[u8; 32]>::from_hex(h);
+    let mut u = [0u8; 32];
         
     for j in 0..32{  
         u[j] = v.unwrap()[j];
@@ -96,26 +94,25 @@ fn hash_vec(input: Vec<RistrettoPoint>) -> Scalar{
 // It initializes a vector of size t. 
 fn init_vec_ristretto(t: usize) -> Vec<RistrettoPoint>{
 
-    let vec = vec![RistrettoPoint::identity();t];
+    let vec = vec![RistrettoPoint::identity(); t];
     return vec
 }
 
 fn init_vec_scalar(t: usize) -> Vec<Scalar> {
     
-    let vec = vec![convert_scalar([0u8;32]);t];
+    let vec = vec![convert_scalar([0u8; 32]); t];
     return vec
 }
     	   
-// Setup of map, clues...
-
-// Generation of types and properties.
+// Setup of cell, clues, etc.
+// Generation of random Ristretto group elements for defining the types and the properties.
 pub fn typesandproperties<T: CryptoRng + RngCore>(csprng: &mut T) -> (Vec<RistrettoPoint>, Vec<RistrettoPoint>, RistrettoPoint){
     
     let mut t: Vec<RistrettoPoint> = Vec::new();
     let mut p: Vec<RistrettoPoint> = Vec::new();
     let bottom = random_point(csprng);
 	
-    // It generates the 5 types.
+    // It generates the five types.
     let mut k = 0;
     while k < 5{
         let mut ti = random_point(csprng);
@@ -126,7 +123,7 @@ pub fn typesandproperties<T: CryptoRng + RngCore>(csprng: &mut T) -> (Vec<Ristre
         k = k + 1;
     }
     
-    // It generates the 14 properties.
+    // It generates the fourteen properties.
     k = 0;
     while k < 14{
         let mut pi = random_point(csprng);
@@ -136,7 +133,7 @@ pub fn typesandproperties<T: CryptoRng + RngCore>(csprng: &mut T) -> (Vec<Ristre
         p.push(pi);
         k = k + 1;
     }
-    return(t,p,bottom)
+    return(t, p, bottom)
 }
 
 //It generates a specific cell. w gives the index of types and x is the set of index of properties for the cel.
@@ -145,7 +142,6 @@ pub fn gencell(t: Vec<RistrettoPoint>, p: Vec<RistrettoPoint>, w: usize, mut x: 
     let ti = t[w];
     let mut pi: Vec<RistrettoPoint> = Vec::new();
     x.sort();
-
     let mut k = 0;
     for i in 0..14{
     	if k < x.len(){
@@ -156,18 +152,16 @@ pub fn gencell(t: Vec<RistrettoPoint>, p: Vec<RistrettoPoint>, w: usize, mut x: 
             }
         }
     }
-    return(ti,pi)
+    return(ti, pi)
 }
 
-// It generates a random cell.
-pub fn randomcell(t: Vec<RistrettoPoint>, p: Vec<RistrettoPoint>) -> (RistrettoPoint, Vec<RistrettoPoint>){
+// It generates a random cell. n is the number of properties for the cell.
+pub fn randomcell(t: Vec<RistrettoPoint>, p: Vec<RistrettoPoint>, n: usize) -> (RistrettoPoint, Vec<RistrettoPoint>){
      
     let between5 = Uniform::from(0..5); 
     let mut rng = rand::thread_rng();  
     let w = between5.sample(&mut rng);
-    let n = 13; // n is the length of the set of properties for the cell
-    let mut x:  Vec<usize> = Vec::new(); 
-    
+    let mut x:  Vec<usize> = Vec::new();   
     let mut k = 0;
     while k < n{
         let between14 = Uniform::from(0..14); 
@@ -181,21 +175,18 @@ pub fn randomcell(t: Vec<RistrettoPoint>, p: Vec<RistrettoPoint>) -> (RistrettoP
         }
         k = k + 1;    
     }
-    let ci = gencell(t,p,w,x);
+    let ci = gencell(t, p, w, x);
     return ci
 }
 
 // It build a random clue:
-// We note j the index of the cell where the cryptid is.
-// i = 0 corresponds to a clue of the form (tj,tk,bot) or (tk,tj,bot) where tj =/= tk,
-// i = 1 corresponds to (bot,bot,p) where p in pj
-// i = 2 corresponds to (ti,tk,bot) where ti =/= tj and tk =/= tj,
-// i = 3 corresponds to (bot,bot,p) where p is not in pj, 
-// The two last cases are used to the algorithms Play and Verify where Answer = 0.
-// The last cases are for testing with bad clues
+// We build two random clues for which the player answer "maybe" for the jth cell.
+// i = 0 corresponds to a clue of the form (tj, tk, bottom) or (tk, tj, bottom) where tj =/= tk,
+// i = 1 corresponds to a clue of the form (bottom, bottom, p) where p in pj,
+// and we build two second other forms of clue for which the player answer "no" for the jth cell. 
+// i = 2 corresponds to (ti, tk, bottom) where ti =/= tj and tk =/= tj,
+// i = 3 corresponds to (bottom, bottom, p) where p is not in pj.
 pub fn buildrandomclue(t: Vec<RistrettoPoint>, p: Vec<RistrettoPoint>, bottom: RistrettoPoint, tj: RistrettoPoint, pj: Vec<RistrettoPoint>, i: usize) -> Vec<RistrettoPoint>{
-
-    let rng = rand::thread_rng(); 
     
     if i == 0{
         let between5 = Uniform::from(0..5); 
@@ -206,10 +197,10 @@ pub fn buildrandomclue(t: Vec<RistrettoPoint>, p: Vec<RistrettoPoint>, bottom: R
         }
         let r = rng.gen_bool(0.5);
         if r == true{
-            return vec![tj,t[r1],bottom];
+            return vec![tj, t[r1], bottom];
         }
         else{
-            return vec![t[r1],tj,bottom];
+            return vec![t[r1], tj, bottom];
         }
     }
     if i == 1{
@@ -219,7 +210,7 @@ pub fn buildrandomclue(t: Vec<RistrettoPoint>, p: Vec<RistrettoPoint>, bottom: R
         while pj[r2] == RistrettoPoint::identity(){
              r2 = betweenpj.sample(&mut rng);
         }
-        return vec![bottom,bottom,pj[r2]];
+        return vec![bottom, bottom, pj[r2]];
     }    
     if i == 2{
     	let between5 = Uniform::from(0..5); 
@@ -231,26 +222,23 @@ pub fn buildrandomclue(t: Vec<RistrettoPoint>, p: Vec<RistrettoPoint>, bottom: R
             r3 = between5.sample(&mut rng);
     	    r4 = between5.sample(&mut rng);
     	}
-    	return vec![t[r3],t[r4],bottom];
+    	return vec![t[r3], t[r4], bottom];
     }
-    if i == 3{
+    else{
         let between14 = Uniform::from(0..14); 
         let mut rng = rand::thread_rng();  
         let mut r5 = between14.sample(&mut rng);
     	while pj.contains(&p[r5]){
     	    r5 = between14.sample(&mut rng);
    	}
-   	return vec![bottom,bottom,p[r5]];
-    }	
-    else{
-        return vec![bottom, bottom, bottom];
+   	return vec![bottom, bottom, p[r5]];
     }
 }
 
-// It measures the running time of the algorithms GenClue, OpenClue, Play, Verify, and it measure the size of the public clue key and the proof for the scheme cc2
+// It measures the running time of the algorithms GenClue, OpenClue, Play, Verify, and it measures the size of the public clue key and the proof for the scheme CC2.
 pub fn measurestimeandsize<T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoint, iter: u32){
     
-     println!("Average of the running time of the algorithms GenClue, OpenClue, Play and Verify, and average of the size of the public clue key and the proof over {:?} iterations.\n", iter);   
+     println!("Average of the computation time of the algorithms GenClue, OpenClue, Play and Verify, and measurements of the size of the public clue key and the proof over {:?} iterations.\n", iter);   
     println!("Execution in progress...\n(It can take a long time)\n");
     
     let mut sumgenclue = vec![Duration::ZERO;4];
@@ -263,13 +251,13 @@ pub fn measurestimeandsize<T: CryptoRng + RngCore>(csprng: &mut T, g0: Ristretto
     let mut averageplay = vec![Duration::ZERO;4];
     let mut averageverify = vec![Duration::ZERO;4];
     
-    let mut pcsize = vec![0,0,0,0];
-    let mut proofsize = vec![0,0,0,0];
+    let mut pcsize = vec![0, 0, 0, 0];
+    let mut proofsize = vec![0, 0, 0, 0];
     
-    let mut averagepcsize = vec![0,0,0,0];
-    let mut averageproofsize = vec![0,0,0,0];
+    let mut averagepcsize = vec![0, 0, 0, 0];
+    let mut averageproofsize = vec![0, 0, 0, 0];
     
-    let vecstr = ["(tj,tk,bottom)","(bottom,bottom,P) where P belongs to Pj","(tl,tk,bottom) where tl != tj and tk != tj","(bottom,bottom,P) where P does not belong to Pj"];
+    let vecstr = ["(Tj, Tk, bottom)", "(bottom, bottom, P) where P belongs to Pj", "(Tl, Tk, bottom) where Tl != Tj and Tk != Tj", "(bottom, bottom, P) where P does not belong to Pj"];
   
     for _j in 0..iter{
     	
@@ -279,20 +267,21 @@ pub fn measurestimeandsize<T: CryptoRng + RngCore>(csprng: &mut T, g0: Ristretto
     	let p = maps.1; // vector of 14 elements
     	let bottom = maps.2;
     	
-        // It defines a random cell
-        let cj = randomcell((&t).to_vec(),(&p).to_vec());
+        // It defines a random cell with foruteen properties. For our performance measurement, we maximize the number of properties, this maximizes the computation time and the proof size.
+        let cj = randomcell((&t).to_vec(), (&p).to_vec(), 14);
         let tj = cj.0;
         let pj = cj.1;
         
-    	// It defines four different form of random clues 
-        let clue0 = buildrandomclue((&t).to_vec(),(&p).to_vec(),bottom,tj,(&pj).to_vec(),0);
-        let clue1 = buildrandomclue((&t).to_vec(),(&p).to_vec(),bottom,tj,(&pj).to_vec(),1);
-        let clue2 = buildrandomclue((&t).to_vec(),(&p).to_vec(),bottom,tj,(&pj).to_vec(),2);
-        let clue3 = buildrandomclue((&t).to_vec(),(&p).to_vec(),bottom,tj,(&pj).to_vec(),3);
-       
-        let cluesplayers = vec![(&clue0).to_vec(),(&clue1).to_vec(),(&clue2).to_vec(),(&clue3).to_vec()];     
-    
-    	let answerplayer = vec![0,1];  
+        // For our performance measurement, we need to build a clue of the form (bottom, bottom, p) with p not in pj, for an answer "no", then we remove a property from the set of properties for the jth cell.
+        let mut pjremove = pj.clone();
+        pjremove.remove(pj.len()-1);
+        
+    	// It defines four different forms of random clue. 
+        let clue0 = buildrandomclue((&t).to_vec(), (&p).to_vec(), bottom, tj, (&pj).to_vec(), 0);
+        let clue1 = buildrandomclue((&t).to_vec(), (&p).to_vec(), bottom, tj, (&pj).to_vec(), 1);
+        let clue2 = buildrandomclue((&t).to_vec(), (&p).to_vec(), bottom, tj, (&pj).to_vec(), 2);
+        let clue3 = buildrandomclue((&t).to_vec(), (&p).to_vec(), bottom, tj, (&pjremove).to_vec(), 3);
+        let cluesplayers = vec![(&clue0).to_vec(), (&clue1).to_vec(), (&clue2).to_vec(), (&clue3).to_vec()];      
     
     	for i in 0..4{
     
@@ -308,42 +297,46 @@ pub fn measurestimeandsize<T: CryptoRng + RngCore>(csprng: &mut T, g0: Ristretto
     	    pcsize[i] += pcdata.expect("REASON").len();
     	    
     	    let startopenclue = Instant::now();
-    	    let open = openclue((&pc).to_vec(),sc);
+    	    let open = openclue((&pc).to_vec(), sc);
     	    let opencluetime = startopenclue.elapsed();
-    	    assert!(open == (&cluesplayers[i]).to_vec(),"open != clue");
-    	    //println!("open != clue: {:?}", open == (&cluesplayers[i]).to_vec());
+    	    assert!(open == (&cluesplayers[i]).to_vec(), "Open clue is not equal to clue");
+    	    //println!("Open clue equal to clue: {:?}", open == (&cluesplayers[i]).to_vec());
     	    sumopenclue[i] += opencluetime;
-    	    
-    	    let mut answer: usize = 2;
-    	    if i == 0 || i == 1{
-    	    	answer = answerplayer[1];
-    	    }
-    	    if i == 2 || i == 3{
-    	    	answer = answerplayer[0];
-    	    }
-    	    
-    	    /*let mut badanswer: usize;
-    	    if answer == 0{
-        	badanswer = 1;
-   	    }
-    	    else{
-    	        badanswer = 0;	
-   	    }*/
-    	
-            let startplay = Instant::now();
-            let proof = play(csprng,g0,(&pc).to_vec(),sc,tj,(&pj).to_vec(),answer);
-            let playtime = startplay.elapsed();
-            sumplay[i] += playtime;
-            let _ = writeproof(&proof);
-    	    let proofdata = fs::metadata("proof.txt");
-    	    proofsize[i] += proofdata.expect("REASON").len();
+    	  
+    	    if i == 0 || i == 1 || i == 2{
+    	        let answer = funanswer(bottom, (&cluesplayers[i]).to_vec(), tj, (&pj).to_vec());
+                let startplay = Instant::now();
+                let proof = play(csprng, g0, (&pc).to_vec(), sc, tj, (&pj).to_vec(), answer);
+                let playtime = startplay.elapsed();
+                sumplay[i] += playtime;
+                let _ = writeproof(&proof);
+    	        let proofdata = fs::metadata("proof.txt");
+    	        proofsize[i] += proofdata.expect("REASON").len();
         
-            let startverify = Instant::now();
-            let b = verify(g0,proof,(&pc).to_vec(),tj,(&pj).to_vec(),answer);
-            assert!(b == true, "verify == false");
-            println!("Verify: {:?}", b == true);
-            let verifytime = startverify.elapsed(); 
-            sumverify[i] += verifytime;  
+                let startverify = Instant::now();
+                let b = verify(g0, proof, (&pc).to_vec(), tj, (&pj).to_vec(), answer);
+                assert!(b == true, "Verify is false");
+                println!("Answer is {:?} and Verify is {:?}.", answer, b == true);
+                let verifytime = startverify.elapsed(); 
+                sumverify[i] += verifytime;    
+            }
+            else{
+                let answer = funanswer(bottom, (&cluesplayers[i]).to_vec(), tj, (&pjremove).to_vec());
+                let startplay = Instant::now();
+                let proof = play(csprng, g0, (&pc).to_vec(),sc,tj,(&pjremove).to_vec(),answer);
+                let playtime = startplay.elapsed();
+                sumplay[i] += playtime;
+                let _ = writeproof(&proof);
+    	        let proofdata = fs::metadata("proof.txt");
+    	        proofsize[i] += proofdata.expect("REASON").len();
+        
+                let startverify = Instant::now();
+                let b = verify(g0, proof, (&pc).to_vec(), tj, (&pjremove).to_vec(), answer);
+                assert!(b == true, "Verify is false");
+                println!("Answer is {:?} and Verify is {:?}.", answer, b == true);
+                let verifytime = startverify.elapsed(); 
+                sumverify[i] += verifytime;          
+            } 
         }        
     }  
     for i in 0..4{
@@ -355,8 +348,15 @@ pub fn measurestimeandsize<T: CryptoRng + RngCore>(csprng: &mut T, g0: Ristretto
     	
     	averagepcsize[i] = pcsize[i]/u64::from(iter);
     	averageproofsize[i] = proofsize[i]/u64::from(iter);
-    
-    	println!("Clue of form {:?}: {} \nGenClue: {:?}, \nOpenClue: {:?}, \nPlay: {:?}, \nVerify: {:?},\nSize of public clue key: {:?} bytes,\nSize of proof {:?} bytes.\n",i,vecstr[i],averagegen[i],averageopen[i],averageplay[i],averageverify[i],averagepcsize[i],averageproofsize[i]);
+        
+        if i == 0 || i == 1{
+            println!("\nAnswer: maybe");
+        }
+        else{
+            println!("Answer: no");
+        }
+          
+    	println!("Clue of form: {} \nGenClue: {:?}, \nOpenClue: {:?}, \nPlay: {:?}, \nVerify: {:?}, \nSize of public clue key: {:?} bytes, \nSize of proof {:?} bytes.\n", vecstr[i], averagegen[i], averageopen[i], averageplay[i], averageverify[i], averagepcsize[i], averageproofsize[i]);
     } 
 } 
   
@@ -373,44 +373,28 @@ pub fn writeproof(proof: &Proof) -> io::Result<()> {
     return Ok(())
 }
   
-// Scheme cc2
-//csprng is the random generator, g0 is the generator used to generates the key pk of the player, clue is a vector of 3 RistrettoPoint which represent the clue = (C1,C2,C3), tj is type of the cell committed, pj is the set of properties of the cell, and answerplayer correspond to the answer of the player on the cell.
-pub fn schemecc2<T: CryptoRng + RngCore>(csprng: &mut T,g0: RistrettoPoint,clue: Vec<RistrettoPoint>,tj: RistrettoPoint,pj: Vec<RistrettoPoint>,answer: usize){
-              
-    let startgenclue = Instant::now();
-    let keyc = genclue(csprng,g0,(&clue).to_vec()); 
-    let gentime = startgenclue.elapsed();
-    println!("GenClue took {:?}.", gentime);
+// Scheme CC2
+//csprng is the random generator, g0 is the generator used to generates the key pk of the player, clue is a vector of three RistrettoPoint which represents the clue = (C1, C2, C3), tj is type of the cell j, pj is the set of properties of the cell j, and answerplayer correspond to the answer of the player on the cell j.
+pub fn schemecc2<T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoint, clue: Vec<RistrettoPoint>, tj: RistrettoPoint, pj: Vec<RistrettoPoint>, answer: usize){
+
+    let keyc = genclue(csprng, g0, (&clue).to_vec()); 
                        
-    let pc = keyc.0; //pc = (pk,c11,c21,c12,c22,c13,c23)
+    let pc = keyc.0; //pc = (pk, c11, c21, c12, c22, c13, c23)
     let _ = writepc((&pc).to_vec());
     let sc = keyc.1; //sc = sk
 
-    let startopenclue = Instant::now();
-    openclue((&pc).to_vec(),sc);
-    let opentime = startopenclue.elapsed();
-    println!("OpenClue took {:?}.", opentime);    
-    //assert!(open == clue, "open != clue");
-    //println!("open != clue: {:?}", open == clue);
+    openclue((&pc).to_vec(), sc);
 	
-    let startplay = Instant::now();
-    let proof = play(csprng,g0,(&pc).to_vec(),sc,tj,(&pj).to_vec(),answer);
+    let proof = play(csprng, g0, (&pc).to_vec(), sc, tj, (&pj).to_vec(), answer);
     let _ = writeproof(&proof);
-    let playtime = startplay.elapsed();
-    println!("Play took {:?}.",playtime);
 	    
-    let startverify = Instant::now();
-    let b = verify(g0,proof,(&pc).to_vec(),tj,(&pj).to_vec(),answer);
-    let vertime = startverify.elapsed(); 
-    println!("Verify took {:?}.\n",vertime);
-    //assert!(b == true,"verify == false");
-    //println!("verify == false: {:?}", b == true);
+    let b = verify(g0, proof, (&pc).to_vec(), tj, (&pj).to_vec(), answer);
 
-    println!("Answer: {:?}; Verify: {:?}\n",answer,b); 	
+    println!("Answer is {:?} and Verify is {:?}.\n", answer, b); 	
 }
 
-// Algorithms for the scheme cc2
-// Algorithm GenClue. g0 is the generator used to generate the player public/secrets clue key.
+// Algorithms for the scheme CC2.
+// Algorithm GenClue. g0 is the generator used to generate the player public clue key.
 pub fn genclue <T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoint, clue: Vec<RistrettoPoint>) -> (Vec<RistrettoPoint>, Scalar){
 
     let key = gen_elgamal(csprng, g0); // key.0 = g, key.1 = pk, key.2 = sk
@@ -430,15 +414,15 @@ pub fn openclue(pc: Vec<RistrettoPoint>, sc: Scalar) -> Vec<RistrettoPoint>{
     let mut clue: Vec<RistrettoPoint> = Vec::new();
     let mut k = 1;
     while k < pc.len(){
-        let c = dec_elgamal(sc,pc[k],pc[k+1]);
+        let c = dec_elgamal(sc, pc[k], pc[k+1]);
         clue.push(c); 
-        k +=2;  
+        k += 2;  
     } 
     return clue
 }
 
 // Algorithm Answer.
-pub fn funanswer(bottom: RistrettoPoint, clue: Vec<RistrettoPoint>,tj: RistrettoPoint,pj: Vec<RistrettoPoint>) -> usize{
+pub fn funanswer(bottom: RistrettoPoint, clue: Vec<RistrettoPoint>, tj: RistrettoPoint, pj: Vec<RistrettoPoint>) -> usize{
     
     if (clue[0] == tj || clue[1] == tj) && clue[2] == bottom{
         return 1
@@ -453,7 +437,7 @@ pub fn funanswer(bottom: RistrettoPoint, clue: Vec<RistrettoPoint>,tj: Ristretto
     return 0
 }
 
-// y0 is the public key pk of the player, y is the vector of c2/tj (or resp. c2/p) s.t. Dec_sk((c1,c2)) = tj (or resp. Dec_sk((c1,c2)) = p in pj), g0 is the generator used to generates the public key of the player, g is the vector of c1, x is the secret key sk of the player. (we prove also that y0 = g0^sk).
+// y0 is the public key pk of the player, y is the vector of c2/tj (or resp. c2/p) s.t. Dec_sk((c1, c2)) = tj (or resp. Dec_sk((c1, c2)) = p in pj), g0 is the generator used to generates the public key of the player, g is the vector of c1, x is the secret key sk of the player. (we prove also that y0 = g0^sk).
 
 // Prove Play "maybe": it generates the zero knowledge proof when the answer of the player is "maybe".
 fn prove_play_maybe<T: CryptoRng + RngCore>(csprng: &mut T, y0: RistrettoPoint, y: Vec<RistrettoPoint>, g0: RistrettoPoint, g: Vec<RistrettoPoint>, x: Scalar) -> Proof{
@@ -481,15 +465,15 @@ fn prove_play_maybe<T: CryptoRng + RngCore>(csprng: &mut T, y0: RistrettoPoint, 
     r[w] = rrr * g[w];
 
     // Simulation for the yi s.t. yi =/= gi^x.
-    let mut c = init_vec_scalar(y.len()); // ci is the challenge corresponds to (yi,gi).
-    let mut z = init_vec_scalar(y.len()); // zi is the respond corresponds to (yi,gi).
+    let mut c = init_vec_scalar(y.len()); // ci is the challenge corresponds to (yi, gi).
+    let mut z = init_vec_scalar(y.len()); // zi is the respond corresponds to (yi, gi).
     
     let respsim = simul_maybe(csprng, (&y).to_vec(), (&g).to_vec(), (&r).to_vec(), (&c).to_vec(), (&z).to_vec(), w);   
     r = respsim.0; 
     c = respsim.1; 
     z = respsim.2;
 
-    // Challenge  
+    // Challenge:  
     let mut conc: Vec<RistrettoPoint> = Vec::new(); // It build the vector for concatenation and hash.    
     conc.push(r0);
     conc.extend((&r).to_vec());
@@ -497,22 +481,22 @@ fn prove_play_maybe<T: CryptoRng + RngCore>(csprng: &mut T, y0: RistrettoPoint, 
     conc.extend((&y).to_vec());
     conc.push(g0);
     conc.extend((&g).to_vec());
-    let cc = hash_vec(conc); // cc is the general challenge, it is the sum of all ci.
+    let cc = hash_vec(conc); // cc is the sum of all ci.
     let mut sum = convert_scalar([0u8;32]);
     for chall in &c{
         sum = sum + chall;
     }
     c[w] = cc - sum;
     
-    // Response
+    // Response:
     let z0 = rr + cc * x;
     z[w] = rrr + c[w] * x;
 
     return Proof::ProofMaybe{r_0: r0, r_1: r, c_1: c, z_0: z0, z_1: z};
 }
 
-// Simulator for the yi such that yi =/= gi^x 
-fn simul_maybe<T: CryptoRng + RngCore>(csprng: &mut T, y: Vec<RistrettoPoint>, g: Vec<RistrettoPoint>, mut r: Vec<RistrettoPoint>, mut c: Vec<Scalar>, mut z: Vec<Scalar>,w: usize) -> (Vec<RistrettoPoint>,Vec<Scalar>,Vec<Scalar>){
+// Simulator for the yi such that yi =/= gi^x. 
+fn simul_maybe<T: CryptoRng + RngCore>(csprng: &mut T, y: Vec<RistrettoPoint>, g: Vec<RistrettoPoint>, mut r: Vec<RistrettoPoint>, mut c: Vec<Scalar>, mut z: Vec<Scalar>, w: usize) -> (Vec<RistrettoPoint>, Vec<Scalar>, Vec<Scalar>){
     
     for k in 0..y.len(){
         if k != w {
@@ -523,7 +507,7 @@ fn simul_maybe<T: CryptoRng + RngCore>(csprng: &mut T, y: Vec<RistrettoPoint>, g
             r[k] = zz * g[k] - chall * y[k];   
         }
     }
-    return(r,c,z)
+    return(r, c, z)
 }
 
 // Verify the proof when the answer is "maybe".
@@ -543,7 +527,7 @@ fn verify_play_maybe(y0: RistrettoPoint, y: Vec<RistrettoPoint>, g0: RistrettoPo
         sum += chall;
     }
     
-    // It verify if the computed challenge is the sum of challenge and zi * gi = ri + ci * yi.
+    // It verifies if the computed challenge is the sum of challenge and zi * gi = ri + ci * yi.
     if cc == sum && z0 * g0 == r0 + cc * y0{
     	for i in 0..y.len(){
     	    if z[i] * g[i] != r[i] + c[i] * y[i]{
@@ -652,7 +636,7 @@ fn verify_play_no(y0: RistrettoPoint, y: Vec<RistrettoPoint>, g0: RistrettoPoint
     return true       
 }
 
-// Algorithm Play. g0 is the generator used to build the public key of the player, pc is the public clue key of the player, sc is the secret clue key of the player, (tj,pj) is the cell_j, answer is the response give by the player for the cell_j.
+// Algorithm Play. g0 is the generator used to build the public clue key of the player, pc is the public clue key, sc is the secret clue key of the player, (tj,pj) is the cell j, answer is the response given by the player for the cell j.
 pub fn play<T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoint, pc: Vec<RistrettoPoint>, sc: Scalar, tj: RistrettoPoint, pj: Vec<RistrettoPoint>, answer: usize)-> Proof{
 
     let y0 = pc[0];
@@ -668,10 +652,10 @@ pub fn play<T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoint, pc: Vec<
 	y.push(pc[6] - pj[i]);
     }
 	
-    if answer == 1{ // answer = maybe
+    if answer == 1{ // answer is maybe.
         return prove_play_maybe(csprng, y0, y, g0, g, sc);  
     }
-    if answer == 0{ // answer = no
+    if answer == 0{ // answer is no.
     	return prove_play_no(csprng, y0, y, g0, g, sc);
     }
     else{
