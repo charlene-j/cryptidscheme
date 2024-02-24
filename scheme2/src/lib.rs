@@ -5,19 +5,19 @@ pub use crate::zkp::*;
 #[cfg(test)]
 mod tests{
     use rand_core::{OsRng};
-    use super::zkp::{typesandproperties, buildrandomclue, randomcell, genclue, openclue, algoanswer, play, verify};
+    use super::zkp::{typesandproperties, buildclue, randomcell, genclue, openclue, algoanswer, play, verify};
     use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
     
     #[test] 
     // It tests if the algorithm Openclue open the correct clue, if the algorithm algoanswer returns the correct answer, if the algorithm Play build a correct proof and if the algorithm Verify returns true.
-    fn testzkp1(){ 
+    fn test1cc2(){ 
 
         // Generation of types, properties and cell.
         let mut csprng = OsRng;	
-        let g0 = RISTRETTO_BASEPOINT_POINT; // g0 is the generator used in the public key of the player.
-        let c = typesandproperties(&mut csprng); // random generation of five types and fourteen properties in RistrettoPoint.
-        let t = c.0; // vector of five types.
-        let p = c.1; // vector of fourteen properties.
+        let g0 = RISTRETTO_BASEPOINT_POINT; // g0 is the generator used to build the public key of the player.
+        let c = typesandproperties(&mut csprng); // Random generation of five types and fourteen properties in RistrettoPoint.
+        let t = c.0; // Vector of five types.
+        let p = c.1; // Vector of fourteen properties.
         let bottom = c.2; 
 	
         // It defines a random cell
@@ -27,7 +27,7 @@ mod tests{
     
         for i in 0..4{
 
-            let clue = buildrandomclue((&t).to_vec(), (&p).to_vec(), bottom, tj, (&pj).to_vec(), i);
+            let clue = buildclue((&t).to_vec(), (&p).to_vec(), bottom, tj, (&pj).to_vec(), i);
             let keyc = genclue(&mut csprng, g0, (&clue).to_vec());               
             let pc = keyc.0; //pc = (pk, c11, c21, c12, c22, c13, c23)
             let sc = keyc.1; //sc = sk
@@ -50,15 +50,15 @@ mod tests{
         }
     }
     #[test] // 
-    // Same as testzkp1 except that it tests if the player give a bad answer, then the algorithm Verify returns false.
-    fn testzkp2(){ 
+    // Same as testzkp1 except that it tests if the player give a bad answer implies that the algorithm Verify returns false.
+    fn test2cc2(){ 
 
-        // Setup of properties and map
+        // Generation of properties and map and cell.
         let mut csprng = OsRng;	
         let g0 = RISTRETTO_BASEPOINT_POINT; // g0 is the generator used in the public key of the player.
-        let c = typesandproperties(&mut csprng); // random generation of five types and fourteen properties in RistrettoPoint.
-        let t = c.0; // vector of five types.
-        let p = c.1; // vector of fourteen properties.
+        let c = typesandproperties(&mut csprng); // Random generation of five types and fourteen properties in RistrettoPoint.
+        let t = c.0; // Vector of five types.
+        let p = c.1; // Vector of fourteen properties.
         let bottom = c.2; 
 	
         // It defines a random cell
@@ -68,13 +68,13 @@ mod tests{
     
         for i in 0..4{
 
-            let clue = buildrandomclue((&t).to_vec(), (&p).to_vec(), bottom, tj, (&pj).to_vec(), i);
+            let clue = buildclue((&t).to_vec(), (&p).to_vec(), bottom, tj, (&pj).to_vec(), i);
             let keyc = genclue(&mut csprng, g0, (&clue).to_vec());               
-            let pc = keyc.0; //pc = (pk, c11, c21, c12, c22, c13, c23)
-            let sc = keyc.1; //sc = sk
+            let pc = keyc.0; // pc = (pk, c11, c21, c12, c22, c13, c23).
+            let sc = keyc.1; // sc = sk.
 
             let open = openclue((&pc).to_vec(), sc);
-            assert!(open == (&clue).to_vec(), "Open clue is not equal to clue");
+            assert!(open == (&clue).to_vec(), "The open clue is not equal to clue");
             
             let answer = algoanswer(bottom, (&clue).to_vec(), tj, (&pj).to_vec());
             let mut badanswer = 2;
