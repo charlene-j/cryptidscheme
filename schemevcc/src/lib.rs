@@ -135,10 +135,8 @@ mod tests{
     }
     
     // It build a random incorrect clue:
-    // i = 0 corresponds to a clue of the form (tj, tj, bottom).
-    // i = 1 corresponds to a clue of the form (tj, tj, p) where p in pj,
-    // i = 2 corresponds to (bottom, bottom, id),
-    // i = 3 corresponds to (bottom, bottom, bottom) .
+    // i = 0 corresponds to a clue of the form (Tj, Tj, bottom).
+    // else corresponds to (bottom, bottom, bottom).
     pub fn buildincorrectclue(bottom: RistrettoPoint, tj: RistrettoPoint, _pj: Vec<RistrettoPoint>, i: usize) -> Vec<RistrettoPoint>{
   
         if i == 0{  
