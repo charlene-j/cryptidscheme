@@ -11,7 +11,6 @@ fn main(){
     let genplayers = vec![g0; d];
     let genmaster = g0;
     let clueforms = vec![0, 0, 1, 1, 1]; // two different forms of clue: 0 and 1.
-    
-    let iter = 10;
+    let iter = 10; // Average over iter iterations.
     measuresvcc(&mut csprng, genmaster, genplayers, clueforms, n, iter);  				
 }
