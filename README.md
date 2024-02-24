@@ -1,5 +1,4 @@
-# Cryptographic Cryptid Protocols:
-## How to Play Cryptid with Cheaters
+# Cryptographic Cryptid Protocols: How to Play Cryptid with Cheaters
 This repository provides an implementation of the main algorithms of our cryptographic cryptid protocols.
 We evaluate the performance (in terms of time and size) of the GenClue, OpenClue, Play and Verify algorithms for the CC1 and CC2 schemes, and the ProveGame and VerifyGame algorithms for the VCC scheme. The measurements allow the calculation of the required memory and latency to play the game online.
 We use the Ristretto prime order group with the curve25519_dalek library: https://docs.rs/curve25519-dalek/latest/curve25519_dalek/ .
