@@ -6,6 +6,6 @@ fn main(){
     let mut csprng = OsRng;	
     let g0 = RISTRETTO_BASEPOINT_POINT; // g0 is the generator used for the public key of the player.
     println!("Performance measurements:"); // Test of performances on iter iterations 
-    let iter = 10;
+    let iter = 10; // Average over iter iterations.
     measurementscc2(&mut csprng, g0, iter);					
 }
