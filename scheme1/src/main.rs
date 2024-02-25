@@ -5,7 +5,7 @@ use cryptocryptid::measurementscc1;
 fn main(){
 
     let mut csprng = OsRng; 
-    let g0 = RISTRETTO_BASEPOINT_POINT; // g0 is the generator used to build the public key of a player
+    let g0 = RISTRETTO_BASEPOINT_POINT; // g0 is the generator used to build the public key of a player.
     let a = vec![RistrettoPoint::identity(), RISTRETTO_BASEPOINT_POINT]; // a is the encoding vector of true and false in RistrettoPoint.
     let n = 108;
     println!("Performance measurements:"); // Test of performances on iter iterations.    
