@@ -21,13 +21,13 @@ mod tests{
         let clue = buildclue((&a).to_vec(), n);
     
         let keyc = genclue(&mut csprng, g0, (&clue).to_vec());                   
-        let pc = keyc.0; //pc = (pk, E1=(c1i, c2i)_{i in [N]}), Ei = Enc_pk(clue[i]).
-        let sc = keyc.1; //sc = sk
+        let pc = keyc.0; //pc = (pk, E[i]=(c1[i], c2[i]) where i belong to {0,...,n-1}, E[i] = Enc_pk(clue[i]).
+        let sc = keyc.1; //sc = sk.
 
         let open = openclue((&pc).to_vec(), sc);
         assert!(open == clue, "The open clue is not equal to the clue.");
         
-        //Generates an random cryptid habitat
+        // It generates a random cryptid habitat.
         let between = Uniform::from(0..n);
         let mut rng = rand::thread_rng();
         let j = between.sample(&mut rng); 
@@ -40,7 +40,7 @@ mod tests{
     }
     
     #[test]
-    // It tests if the player give an incorrect answer, then the algorithm Verify returns false.
+    // It tests if the player give an incorrect answer, implies that the algorithm Verify returns false.
     fn test2cc1(){
     
         let g0 = RISTRETTO_BASEPOINT_POINT; // g0 is the generator used to build the public key of a player.
@@ -51,13 +51,13 @@ mod tests{
         let clue = buildclue((&a).to_vec(), n);
     
         let keyc = genclue(&mut csprng, g0, (&clue).to_vec());                   
-        let pc = keyc.0; // pc = (pk, c11, c21, c12, c22, ..., c1n, c2n).
+        let pc = keyc.0; // pc = (pk, c1[0], c2[0], c1[1], c2[1], ..., c1[n-1], c2[n-1]).
         let sc = keyc.1; // sc = sk.
 
         let open = openclue((&pc).to_vec(), sc);
         assert!(open == clue, "The open clue is not equal to the clue.");
         
-        //Generates an random cryptid habitat
+        // It generates a random cryptid habitat.
         let between = Uniform::from(0..n);
         let mut rng = rand::thread_rng();
         let j = between.sample(&mut rng); 
