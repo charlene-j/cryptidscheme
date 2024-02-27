@@ -684,5 +684,3 @@ pub fn verify(g0: RistrettoPoint, proof: Proof, pc: Vec<RistrettoPoint>, tj: Ris
     }
     return b  
 }
-    return b  
-}
