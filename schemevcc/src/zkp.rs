@@ -272,18 +272,18 @@ pub fn buildmaster< T: CryptoRng + RngCore>(csprng: &mut T, genmaster: Ristretto
     let mut pg: Vec<RistrettoPoint> = Vec::new();
     pg.push(key.1);
     let e0 = enc_elgamal(csprng, genmaster, pg[0], tj);
-    pg.push(e0.0); //c1
-    pg.push(e0.1); //c2
+    pg.push(e0.0); 
+    pg.push(e0.1); 
     for prop in p{
         if pj.contains(&prop){
 	    let e = enc_elgamal(csprng, genmaster, pg[0],prop);
-	    pg.push(e.0); // c1 
-	    pg.push(e.1); // c2
+	    pg.push(e.0); 
+	    pg.push(e.1); 
 	}
 	else{
 	    let e = enc_elgamal(csprng, genmaster, pg[0], RistrettoPoint::identity());
-	    pg.push(e.0); // c1
-	    pg.push(e.1); // c2
+	    pg.push(e.0);
+	    pg.push(e.1); 
 	}	
     }
     return (pg, key.2)
@@ -1608,7 +1608,5 @@ pub fn simul_or<T: CryptoRng + RngCore>(csprng: &mut T, y: Vec<RistrettoPoint>, 
     	    r[i] = z[i] * g[i] - c[i] * y[i];
         }
     }
-    return(r, c, z);
-}
     return(r, c, z);
 }
