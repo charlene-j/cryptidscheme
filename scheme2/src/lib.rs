@@ -29,20 +29,20 @@ mod tests{
 
             let clue = buildclue((&t).to_vec(), (&p).to_vec(), bottom, tj, (&pj).to_vec(), i);
             let keyc = genclue(&mut csprng, g0, (&clue).to_vec());               
-            let pc = keyc.0; // pc = (pk, c11, c21, c12, c22, c13, c23).
+            let pc = keyc.0; // pc = (pk, c1[0], c2[0], c1[1], c2[1], c1[2], c2[2]).
             let sc = keyc.1; // sc = sk.
 
             let open = openclue((&pc).to_vec(), sc);
             assert!(open == (&clue).to_vec(), "The open clue is not equal to the clue.");
             
-            let answer = algoanswer(bottom, (&clue).to_vec(), tj, (&pj).to_vec());
-            
+            let answer: usize;
             if i == 0 || i == 1{
-                assert!(answer == 1, "Incorrect answer");
+                answer = 1;
             }
             else{
-                assert!(answer == 0, "Incorrect answer");
+                answer = 0;
             }
+            assert!(answer == algoanswer(bottom, (&clue).to_vec(), tj, (&pj).to_vec()), "The answer is not correct.");
             
             let proof = play(&mut csprng, g0, (&pc).to_vec(), sc, tj, (&pj).to_vec(), answer);
             let b = verify(g0, proof, (&pc).to_vec(), tj, (&pj).to_vec(), answer);
@@ -70,21 +70,21 @@ mod tests{
 
             let clue = buildclue((&t).to_vec(), (&p).to_vec(), bottom, tj, (&pj).to_vec(), i);
             let keyc = genclue(&mut csprng, g0, (&clue).to_vec());               
-            let pc = keyc.0; // pc = (pk, c11, c21, c12, c22, c13, c23).
+            let pc = keyc.0; // pc = (pk, c1[0], c2[0], c1[1], c2[1], c1[2], c2[2]).
             let sc = keyc.1; // sc = sk.
 
             let open = openclue((&pc).to_vec(), sc);
             assert!(open == (&clue).to_vec(), "The open clue is not equal to the clue.");
             
-            let answer = algoanswer(bottom, (&clue).to_vec(), tj, (&pj).to_vec());
-            let mut badanswer = 2;
-            
-            if answer == 0{
-                badanswer = 1;
-            }
-            if answer == 1{
+            let badanswer: usize;
+            if i == 0 || i == 1{
                 badanswer = 0;
             }
+            else{
+                badanswer = 1;
+            }
+            let correctanswer = algoanswer(bottom, (&clue).to_vec(), tj, (&pj).to_vec());
+            assert!(correctanswer == 1 - badanswer, "badanswer is not correct");
              
             let proof = play(&mut csprng, g0, (&pc).to_vec(), sc, tj, (&pj).to_vec(), badanswer);
             let b = verify(g0, proof, (&pc).to_vec(), tj, (&pj).to_vec(), badanswer);
