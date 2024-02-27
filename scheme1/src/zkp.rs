@@ -104,8 +104,8 @@ pub fn buildclue(a: Vec<RistrettoPoint>, n: usize) -> Vec<RistrettoPoint>{
 // It measures the running time of the algorithm GenClue, OpenClue, Play and Verify and the size of the files containing pc and proof.
 pub fn measurementscc1<T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoint, a: Vec<RistrettoPoint>, n: usize, iter: u32){
     
-    println!("Average of the computation time of the algorithms GenClue, OpenClue, Play and Verify, and measurements of the size of the public clue key and the proof over {:?} iterations.\n", iter);   
-    println!("Execution in progress...\n(It can take a long time)\n");
+    println!("Average of the computation time of the algorithms GenClue, OpenClue, Play and Verify, and average of the size of the public clue key and the proof, calculated over {:?} iterations.\n", iter);   
+    println!("Execution in progress...\n(The process may take a long time.)\n");
 
     let playeranswer = vec![0,1];
   
@@ -138,7 +138,7 @@ pub fn measurementscc1<T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoin
         assert!(open == clue, "The open clue is not equal to the clue.");
         sumopenclue += opencluetime;  
     	
-    	for k in 0..2{ // k corresponds to the type of clue : true or false, which depend of the answer, for our measurements the algorithm find a cell j such that clue[j] = a[k] where a[0] is the encoding of false and a[1] is the encoding of true.
+    	for k in 0..2{ // k corresponds to the type of clue: true/false, which depend of the answer, for our measurements the algorithm find a cell j such that clue[j] = a[k] where a[0] is the encoding of false and a[1] is the encoding of true.
             
             let answer = playeranswer[k];
             let mut j = 0;
@@ -201,8 +201,8 @@ pub fn genclue<T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoint, clue:
     pc.push(key.1);
     for c in clue {
         let e = enc_elgamal(csprng, g0, pc[0], c);
-	pc.push(e.0); // It corresponds to c1. 
-	pc.push(e.1); // It corresponds to c2.	
+	pc.push(e.0); // It corresponds to c1 in the ElGamal encryption.
+	pc.push(e.1); // It corresponds to c2 in the ElGamal encryption.	
     }
     return (pc, key.2)
 }  
@@ -220,7 +220,8 @@ pub fn openclue(pc: Vec<RistrettoPoint>, sc: Scalar) -> Vec<RistrettoPoint>{
     return clue
 }
 
-// Answer: a is the encoding vector of false/true in RistrettoPoint.
+// Answer: 
+// a is the encoding vector of false/true in RistrettoPoint.
 pub fn algoanswer(a: Vec<RistrettoPoint>, clue: Vec<RistrettoPoint>, j: usize) -> usize{
     
     if clue[j] == a[0]{
