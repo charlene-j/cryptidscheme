@@ -1,28 +1,28 @@
 use rand_core::{CryptoRng, RngCore};
 use rand::{Rng, distributions::{Distribution, Uniform}};
-use std::{time::Duration, time::Instant, io, io::Write, fs::File, fs};
-use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar, traits::Identity, constants::RISTRETTO_BASEPOINT_POINT};
+use std::{time::Duration, time::Instant, io, io::Write, io::Read, io::IoSlice, fs::File, fs};
+use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar, traits::Identity, constants::RISTRETTO_BASEPOINT_POINT, ristretto::CompressedRistretto};
 use sha256::digest;
 use hex::FromHex;
 
 // Definition of structures for the proofs.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Proof{
     ProofMaybe{r_0: RistrettoPoint, r_1: Vec<RistrettoPoint>, c_1: Vec<Scalar>, z_0: Scalar, z_1: Vec<Scalar>},
     ProofNo{y_0_p: RistrettoPoint, y_1_p: Vec<RistrettoPoint>, r_0: RistrettoPoint, r_r: Vec<RistrettoPoint>, s_0: RistrettoPoint, s_s: Vec<RistrettoPoint>, u_u: Scalar, v_v: Scalar},
     Error{err: bool},
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Proofgame0{r_0: RistrettoPoint, r_1: Vec<RistrettoPoint>, r_2: Vec<RistrettoPoint>, c_c: Vec<Scalar>, z_0: Scalar, z_z: Vec<Scalar>}
  
-#[derive(Debug)]   
+#[derive(Debug, PartialEq)]   
 pub struct Proofgame1{r_0: RistrettoPoint, r_1: Vec<RistrettoPoint>, r_2: Vec<RistrettoPoint>, c_1: Vec<Scalar>, c_2: Vec<Scalar>, z_0: Scalar, z_1: Vec<Scalar>, z_2: Vec<Scalar>}
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Proofgame2{r_0: RistrettoPoint, r_a: RistrettoPoint, r_1: Vec<RistrettoPoint>, r_2: Vec<RistrettoPoint>, c_c: Vec<Scalar>, z_0: Scalar, z_a: Scalar, z_1: Vec<Scalar>, z_2: Vec<Scalar>}
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Proofgame3{y_1_p: RistrettoPoint, y_2_p: RistrettoPoint, r_0: RistrettoPoint, r_1: RistrettoPoint, s_1: RistrettoPoint, r_2: RistrettoPoint, s_2: RistrettoPoint, r_3: Vec<RistrettoPoint>, r_4: Vec<RistrettoPoint>, r_5: RistrettoPoint, r_6: RistrettoPoint, r_7: Vec<RistrettoPoint>, c_00: Scalar, c_01: Scalar, c_3: Vec<Scalar>, c_4: Vec<Scalar>, c_7: Vec<Scalar>, z_0: Scalar, u_u: Scalar, v_v: Scalar, z_3: Vec<Scalar>, z_4: Vec<Scalar>, z_56: Scalar, z_7: Vec<Scalar>}
 
 // It generates a random scalar (given in the curve25519_dalek library).
@@ -306,23 +306,309 @@ pub fn buildrandommap(t: Vec<RistrettoPoint>, p: Vec<RistrettoPoint>, n: usize) 
     return(maptypes, mapprop);
 }
 
-// It write the public clue or the proofs in a file.
-pub fn writepc(pc: Vec<RistrettoPoint>) -> io::Result<()> {
-    let mut file = File::create("pc.txt")?;
-    file.write_fmt(format_args!("{:?}", pc))?;
+// It write the proof of correct game in a file.
+fn wexportproofgame(pg: Vec<RistrettoPoint>, proof0: &Proofgame0, proof1: &Proofgame1, proof2: &Vec<Proofgame2>, proof3: &Vec<Proofgame3>) -> io::Result<()>{
+    let mut vecproof : Vec<[u8; 32]> = Vec::new();
+    let mut file = File::options().write(true).truncate(true).create(true).open("proofgame.txt")?;
+    for i in 0..pg.len(){
+    	vecproof.push(((pg[i]).compress()).to_bytes());	
+    }
+    match proof0{
+    	Proofgame0{r_0, r_1, r_2, c_c, z_0, z_z} =>{
+    	    vecproof.push(((r_0).compress()).to_bytes());
+    	    for i in 0..r_1.len(){
+    	    	vecproof.push(((r_1[i]).compress()).to_bytes());		
+    	    }
+    	    for i in 0..r_2.len(){
+    	    	vecproof.push(((r_2[i]).compress()).to_bytes());	
+    	    }
+    	    for i in 0..c_c.len(){
+    	    	vecproof.push((c_c[i]).to_bytes());
+    	    }
+    	    vecproof.push((z_0).to_bytes());
+    	    for i in 0..z_z.len(){
+    	    	vecproof.push((z_z[i]).to_bytes());
+    	    }
+    	},
+    }
+    match proof1{
+    	Proofgame1{r_0, r_1, r_2, c_1, c_2, z_0, z_1, z_2} =>{ 
+    	    vecproof.push(((r_0).compress()).to_bytes());
+    	    for i in 0..r_1.len(){
+    	    	vecproof.push(((r_1[i]).compress()).to_bytes());
+    	    }
+    	    for i in 0..r_2.len(){
+    	    	vecproof.push(((r_2[i]).compress()).to_bytes());	
+    	    }
+    	    for i in 0..c_1.len(){
+    	    	vecproof.push((c_1[i]).to_bytes());	
+    	    }
+    	    for i in 0..c_2.len(){
+    	    	vecproof.push((c_2[i]).to_bytes());	
+    	    }
+    	    vecproof.push((z_0).to_bytes()); 
+    	    for i in 0..z_1.len(){ 
+    	    	vecproof.push((z_1[i]).to_bytes());
+    	    } 
+    	    for i in 0..z_2.len(){ 
+    	    	vecproof.push((z_2[i]).to_bytes());
+    	    }
+    	},
+    }
+    for p2 in proof2{
+    	match p2{
+    	    Proofgame2{r_0, r_a, r_1, r_2, c_c, z_0, z_a, z_1, z_2} =>{ 
+    	    	vecproof.push(((r_0).compress()).to_bytes());
+    	    	vecproof.push(((r_a).compress()).to_bytes());
+    	    	for i in 0..r_1.len(){
+    	    	    vecproof.push(((r_1[i]).compress()).to_bytes());	
+    	        }
+    	        for i in 0..r_2.len(){
+    	    	    vecproof.push(((r_2[i]).compress()).to_bytes());	
+    	        }
+    	        for i in 0..c_c.len(){
+    	    	    vecproof.push((c_c[i]).to_bytes());
+    	        }
+    	        vecproof.push((z_0).to_bytes()); 
+    	        vecproof.push((z_a).to_bytes()); 
+    	        for i in 0..z_1.len(){ 
+    	    	    vecproof.push((z_1[i]).to_bytes());
+    	        } 
+    	        for i in 0..z_2.len(){ 
+    	    	    vecproof.push((z_2[i]).to_bytes());
+    	        }
+    	    },
+        }
+    }
+    for p3 in proof3{
+    	match p3{
+    	    Proofgame3{y_1_p, y_2_p, r_0, r_1, s_1, r_2, s_2, r_3, r_4, r_5, r_6, r_7, c_00, c_01, c_3, c_4, c_7, z_0, u_u, v_v, z_3, z_4, z_56, z_7} =>{ 
+    	    	vecproof.push(((y_1_p).compress()).to_bytes());	
+    	    	vecproof.push(((y_2_p).compress()).to_bytes());	
+    	    	vecproof.push(((r_0).compress()).to_bytes());
+    	    	vecproof.push(((r_1).compress()).to_bytes());
+    	    	vecproof.push(((s_1).compress()).to_bytes());
+    	    	vecproof.push(((r_2).compress()).to_bytes());
+    	    	vecproof.push(((s_2).compress()).to_bytes());
+    	    	for i in 0..r_3.len(){
+    	    	    vecproof.push(((r_3[i]).compress()).to_bytes());		
+    	        }
+    	        for i in 0..r_4.len(){
+    	    	    vecproof.push(((r_4[i]).compress()).to_bytes());	
+    	        }
+    	        vecproof.push(((r_5).compress()).to_bytes());
+    	    	vecproof.push(((r_6).compress()).to_bytes());
+    	    	for i in 0..r_7.len(){
+    	    	    vecproof.push(((r_7[i]).compress()).to_bytes());
+    	        }
+    	        vecproof.push((c_00).to_bytes());
+    	        vecproof.push((c_01).to_bytes());
+    	        for i in 0..c_3.len(){
+    	    	    vecproof.push((c_3[i]).to_bytes());	
+    	        }
+    	        for i in 0..c_4.len(){
+    	    	    vecproof.push((c_4[i]).to_bytes());	
+    	        }
+    	        for i in 0..c_7.len(){
+    	    	    vecproof.push((c_7[i]).to_bytes());	
+    	        }
+    	        vecproof.push((z_0).to_bytes());
+    	        vecproof.push((u_u).to_bytes());
+    	        vecproof.push((v_v).to_bytes()); 
+    	        for i in 0..z_3.len(){ 
+    	    	    vecproof.push((z_3[i]).to_bytes());
+    	        } 
+    	        for i in 0..z_4.len(){ 
+    	    	    vecproof.push((z_4[i]).to_bytes());
+    	        } 
+    	        vecproof.push((z_56).to_bytes());
+    	        for i in 0..z_7.len(){ 
+    	    	    vecproof.push((z_7[i]).to_bytes());
+    	        }
+    	    },
+        }
+    }
+    for i in 0..vecproof.len(){
+        file.write_vectored(&[IoSlice::new(&vecproof[i])])?;
+    }
     return Ok(())
 }
 
-pub fn writeproof(proof: &Proof) -> io::Result<()> {
-    let mut file = File::create("proof.txt")?;
-    file.write_fmt(format_args!("{:?}", proof))?;
-    return Ok(())
-}
-
-pub fn writeproofgame(pg: Vec<RistrettoPoint>, proof0: &Proofgame0, proof1: &Proofgame1, proof2: &Vec<Proofgame2>, proof3: &Vec<Proofgame3>) -> io::Result<()> {
-    let mut file = File::create("proofgame.txt")?;
-    file.write_fmt(format_args!("{:?}{:?}{:?}{:?}{:?}", pg, proof0, proof1, proof2, proof3))?;
-    return Ok(())
+// It read the proof of correct game located in a file.
+fn rexportproofgame(d: usize, n: usize) -> (Vec<RistrettoPoint>, Proofgame0, Proofgame1, Vec<Proofgame2>,Vec<Proofgame3>){
+    let len = 31;
+    let l = 14;
+    let s = 16;
+    let t = 5;
+    let mut buffer = Vec::new();
+    let file = File::open("proofgame.txt"); 
+    let _= file.expect("REASON").read_to_end(&mut buffer); 
+    let mut vecp : Vec<[u8;32]> = Vec::new();
+    let mut array = [0u8;32];
+    for i in 0..buffer.len(){
+    	array[i%32] = buffer[i];
+    	if i%32 == 31 && i>0{
+    		vecp.push(array.clone());
+    	}
+    }
+    // pg
+    let mut pg : Vec<RistrettoPoint> = Vec::new();
+    for i in 0..len{
+    	pg.push(CompressedRistretto(vecp[i]).decompress().unwrap());
+    }
+    
+    // Proof rho_0:
+    let mut r10 : Vec<RistrettoPoint> = Vec::new();
+    let mut r20 : Vec<RistrettoPoint> = Vec::new();
+    let mut cc0 : Vec<Scalar> = Vec::new();
+    let mut zz0 : Vec<Scalar> = Vec::new();
+    let r00 = CompressedRistretto(vecp[len]).decompress().unwrap();
+    for i in len+1..len+n+1{
+    	r10.push(CompressedRistretto(vecp[i]).decompress().unwrap());
+    }
+    for i in len+n+1..len+2*n+1{
+    	r20.push(CompressedRistretto(vecp[i]).decompress().unwrap());
+    }
+    for i in len+2*n+1..len+3*n+1{
+    	cc0.push(Scalar::from_bytes_mod_order(vecp[i]));
+    }
+    let z00 = Scalar::from_bytes_mod_order(vecp[len+3*n+1]);
+    for i in len+3*n+2..len+4*n+2{
+    	zz0.push(Scalar::from_bytes_mod_order(vecp[i])); 	
+    }
+    
+    // Proof rho_1:
+    let mut r11 : Vec<RistrettoPoint> = Vec::new();
+    let mut r21 : Vec<RistrettoPoint> = Vec::new();
+    let mut c11 : Vec<Scalar> = Vec::new();
+    let mut c21 : Vec<Scalar> = Vec::new();
+    let mut z11 : Vec<Scalar> = Vec::new();
+    let mut z21 : Vec<Scalar> = Vec::new();
+    let r01 = CompressedRistretto(vecp[len+4*n+2]).decompress().unwrap();
+    for i in len+4*n+3..len+4*n+3+l{
+        r11.push(CompressedRistretto(vecp[i]).decompress().unwrap());
+    }
+    for i in len+4*n+3+l..len+4*n+3+2*l{
+        r21.push(CompressedRistretto(vecp[i]).decompress().unwrap());
+    }
+    for i in len+4*n+3+2*l..len+4*n+3+3*l{
+    	c11.push(Scalar::from_bytes_mod_order(vecp[i]));
+    }
+    for i in len+4*n+3+3*l..len+4*n+3+4*l{
+    	c21.push(Scalar::from_bytes_mod_order(vecp[i]));
+    }
+    let z01 = Scalar::from_bytes_mod_order(vecp[len+4*n+3+4*l]);
+    for i in len+4*n+4+4*l..len+4*n+4+5*l{
+    	z11.push(Scalar::from_bytes_mod_order(vecp[i]));
+    }
+    for i in len+4*n+4+5*l..len+4*n+4+6*l{
+    	z21.push(Scalar::from_bytes_mod_order(vecp[i]));
+    }
+    
+    let mut k = len+4*n+4+6*l;
+    //Proof rho_2:
+    let mut proof2 : Vec<Proofgame2> = Vec::new();
+    for _j in 0..d{
+    
+    	let mut r12 : Vec<RistrettoPoint> = Vec::new();
+    	let mut r22 : Vec<RistrettoPoint> = Vec::new();
+    	let mut cc2 : Vec<Scalar> = Vec::new();
+    	let mut z12 : Vec<Scalar> = Vec::new();
+    	let mut z22 : Vec<Scalar> = Vec::new();
+    	let r02 = CompressedRistretto(vecp[k]).decompress().unwrap();
+    	let ra2 = CompressedRistretto(vecp[k+1]).decompress().unwrap();
+    	for i in k+2..k+s+2{
+    	    r12.push(CompressedRistretto(vecp[i]).decompress().unwrap());
+    	}
+    	for i in k+s+2..k+2*s+2{
+    	    r22.push(CompressedRistretto(vecp[i]).decompress().unwrap());
+    	}
+    	for i in k+2*s+2..k+3*s+2{
+    	    cc2.push(Scalar::from_bytes_mod_order(vecp[i]));
+    	}
+    	let z02 = Scalar::from_bytes_mod_order(vecp[k+3*s+2]);
+    	let za2 = Scalar::from_bytes_mod_order(vecp[k+3*s+3]);
+    	for i in k+3*s+4..k+4*s+4{
+    	    z12.push(Scalar::from_bytes_mod_order(vecp[i]));
+    	}
+    	for i in k+4*s+4..k+5*s+4{
+    	    z22.push(Scalar::from_bytes_mod_order(vecp[i]));
+    	}
+    	k = k+5*s+4;
+    	proof2.push(Proofgame2{r_0: r02, r_a: ra2, r_1: r12, r_2: r22, c_c: cc2, z_0: z02, z_a: za2, z_1: z12, z_2: z22});
+    }
+    
+    //Proof rho_3:
+    let mut proof3 : Vec<Proofgame3> = Vec::new();
+    for _j in 0..d{
+    
+    	let mut r3 : Vec<RistrettoPoint> = Vec::new();
+    	let mut r4 : Vec<RistrettoPoint> = Vec::new();
+    	let mut r7 : Vec<RistrettoPoint> = Vec::new();
+    	let mut c3 : Vec<Scalar> = Vec::new();
+    	let mut c4 : Vec<Scalar> = Vec::new();
+    	let mut c7 : Vec<Scalar> = Vec::new();
+    	let mut z3 : Vec<Scalar> = Vec::new();
+    	let mut z4 : Vec<Scalar> = Vec::new();
+    	let mut z7 : Vec<Scalar> = Vec::new();
+    	let y1_p = CompressedRistretto(vecp[k]).decompress().unwrap();
+    	let y2_p = CompressedRistretto(vecp[k+1]).decompress().unwrap();
+    	let r03 = CompressedRistretto(vecp[k+2]).decompress().unwrap();
+    	let r13 = CompressedRistretto(vecp[k+3]).decompress().unwrap();
+    	let s13 = CompressedRistretto(vecp[k+4]).decompress().unwrap();
+    	let r23 = CompressedRistretto(vecp[k+5]).decompress().unwrap();
+    	let s23 = CompressedRistretto(vecp[k+6]).decompress().unwrap();
+    	k = k+6+1;
+    	for i in k..k+t{
+            r3.push(CompressedRistretto(vecp[i]).decompress().unwrap());
+    	}
+    	for i in k+t..k+2*t{
+            r4.push(CompressedRistretto(vecp[i]).decompress().unwrap());	
+    	}
+    	let r5 = CompressedRistretto(vecp[k+2*t]).decompress().unwrap();
+    	let r6 = CompressedRistretto(vecp[k+2*t+1]).decompress().unwrap();
+    	k = k+2*t+2;
+    	for i in k..k+l{
+            r7.push(CompressedRistretto(vecp[i]).decompress().unwrap());  	
+    	}
+    	k = k+l;
+    	let c003 = Scalar::from_bytes_mod_order(vecp[k]);
+    	let c013 = Scalar::from_bytes_mod_order(vecp[k+1]);
+    	k = k+2;
+    	for i in k..k+t{
+            c3.push(Scalar::from_bytes_mod_order(vecp[i]));	
+    	}
+    	k = k+t;
+    	for i in k..k+t{
+            c4.push(Scalar::from_bytes_mod_order(vecp[i]));	
+    	}
+    	for i in k+t..k+t+l{
+            c7.push(Scalar::from_bytes_mod_order(vecp[i]));	
+    	}
+    	k = k+t+l;
+    	let z03 = Scalar::from_bytes_mod_order(vecp[k]);
+    	let uu = Scalar::from_bytes_mod_order(vecp[k+1]);
+    	let vv = Scalar::from_bytes_mod_order(vecp[k+2]);
+    	k = k+3;
+    	for i in k..k+t{
+            z3.push(Scalar::from_bytes_mod_order(vecp[i]));	
+    	}
+    	for i in k+t..k+2*t{
+            z4.push(Scalar::from_bytes_mod_order(vecp[i]));	
+    	}
+    	let z56 = Scalar::from_bytes_mod_order(vecp[k+2*t]);
+    	k = k+2*t+1;
+    	for i in k..k+l{
+            z7.push(Scalar::from_bytes_mod_order(vecp[i]));	
+    	}
+    	k = k+l;
+    	proof3.push(Proofgame3{y_1_p: y1_p, y_2_p: y2_p, r_0: r03, r_1: r13, s_1: s13, r_2: r23, s_2: s23, r_3: r3, r_4: r4, r_5: r5, r_6: r6, r_7: r7, c_00: c003, c_01: c013, c_3: c3, c_4: c4, c_7: c7, z_0: z03, u_u: uu, v_v: vv, z_3: z3, z_4: z4, z_56: z56, z_7: z7});
+    }
+    return (pg, 
+    Proofgame0{r_0: r00, r_1: r10, r_2: r20, c_c: cc0, z_0: z00, z_z: zz0}, 
+    Proofgame1{r_0: r01, r_1: r11, r_2: r21, c_1: c11, c_2: c21, z_0: z01, z_1: z11, z_2: z21},
+    proof2,
+    proof3);    
 }
 
 // Algorithm GenClue. g0 is the generator used to generate the public key of the player.
@@ -659,6 +945,7 @@ pub fn measurementsvcc<T: CryptoRng + RngCore>(csprng: &mut T, genmaster: Ristre
         let t = maps.0; // Vector of five types.
         let p = maps.1; // Vector of fourteen properties.
         let bottom = maps.2;
+        let d = genplayers.len();
     
     	//It generates a random map
     	let map = buildrandommap((&t).to_vec(),(&p).to_vec(),n);
@@ -688,7 +975,13 @@ pub fn measurementsvcc<T: CryptoRng + RngCore>(csprng: &mut T, genmaster: Ristre
         let proof3 = proof.4;
         
         // It write the proof of the correct game in the file "proofgame.txt".
-        let _ = writeproofgame((&pg).to_vec(), &proof0, &proof1, &proof2, &proof3);
+        let _ = wexportproofgame((&pg).to_vec(), &proof0, &proof1, &proof2, &proof3);
+        let newproof = rexportproofgame(d, n);
+        assert!(pg == newproof.0, "pg in the file is not equal to the real pg");
+        assert!(proof0 == newproof.1, "proof0 in the file is not equal to the real proof0");
+        assert!(proof1 == newproof.2, "proof1 in the file is not equal to the real proof1");
+        assert!(proof2 == newproof.3, "proof2 in the file is not equal to the real proof2");
+        assert!(proof3 == newproof.4, "proof3 in the file is not equal to the real proof3");
     	let proofdata = fs::metadata("proofgame.txt");
     	proofgamesize += proofdata.expect("REASON").len();
     
@@ -702,7 +995,7 @@ pub fn measurementsvcc<T: CryptoRng + RngCore>(csprng: &mut T, genmaster: Ristre
     let averageprovegametime = sumprovegame/iter;
     let averageverifygametime = sumverifygame/iter;
     let averageproofgamesize = proofgamesize/u64::from(iter);
-    println!("\nProveGame: {:?}\nVerifyGame: {:?}\nSize of proof of correct game: {:?}\n", averageprovegametime, averageverifygametime, averageproofgamesize);
+    println!("\nProveGame: {:?}\nVerifyGame: {:?}\nSize of proof of correct game: {:?} bytes\n", averageprovegametime, averageverifygametime, averageproofgamesize);
 }
 
 // Algorithms for the scheme VCC:
