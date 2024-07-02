@@ -2,11 +2,15 @@ use rand_core::{CryptoRng, RngCore};
 use rand::{Rng, distributions::{Distribution, Uniform}};
 use std::{time::Duration, time::Instant, io, io::Write, fs::File, fs};
 use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar, traits::Identity, constants::RISTRETTO_BASEPOINT_POINT};
+use curve25519_dalek::ristretto::CompressedRistretto;
 use sha256::digest;
 use hex::FromHex;
+use std::io::Read;
+use std::io::IoSlice;
+
 
 // Definition of structure for the proof.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Proof{
 
     ProofMaybe{r_0: RistrettoPoint, r_1: Vec<RistrettoPoint>, c_1: Vec<Scalar>, z_0: Scalar, z_1: Vec<Scalar>},
@@ -288,7 +292,9 @@ pub fn measurementscc2<T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoin
 	    
 	    let pc = keyc.0; 
     	    let sc = keyc.1;
-    	    let _ = writepc((&pc).to_vec());
+    	    let _ = wexport((&pc).to_vec());
+            let newpc = rexport();
+            assert!(newpc == pc, "The pc in the file in not equal to the real pc");
     	    let pcdata = fs::metadata("pc.txt");
     	    pcsize[i] += pcdata.expect("REASON").len();
     	    
@@ -311,7 +317,9 @@ pub fn measurementscc2<T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoin
                 let proof = play(csprng, g0, (&pc).to_vec(), sc, tj, (&pj).to_vec(), answer);
                 let playtime = startplay.elapsed();
                 sumplay[i] += playtime;
-                let _ = writeproof(&proof);
+                let _ = wexportproof(&proof);
+                let newproof = rexportproof(answer, pj.clone());
+                assert!(newproof == proof, "The proof in the file is not equal to the real proof");
     	        let proofdata = fs::metadata("proof.txt");
     	        proofsize[i] += proofdata.expect("REASON").len();
         
@@ -329,8 +337,10 @@ pub fn measurementscc2<T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoin
                 let proof = play(csprng, g0, (&pc).to_vec(),sc,tj,(&pjremove).to_vec(),answer);
                 let playtime = startplay.elapsed();
                 sumplay[i] += playtime;
-                let _ = writeproof(&proof);
+                let _ = wexportproof(&proof);
+                let newproof = rexportproof(answer, pjremove.clone());
     	        let proofdata = fs::metadata("proof.txt");
+    	        assert!(newproof == proof, "The proof in the file is not equal to the real proof");
     	        proofsize[i] += proofdata.expect("REASON").len();
         
                 let startverify = Instant::now();
@@ -351,9 +361,9 @@ pub fn measurementscc2<T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoin
     	
     	averagepcsize[i] = pcsize[i]/u64::from(iter);
     	averageproofsize[i] = proofsize[i]/u64::from(iter);
-        
+        print!("\n");
         if i == 0 || i == 1{
-            println!("\nAnswer: maybe");
+            println!("Answer: maybe");
         }
         else{
             println!("Answer: no");
@@ -363,17 +373,138 @@ pub fn measurementscc2<T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoin
     } 
 } 
   
-// It write the public clue or the proof in a file.
-pub fn writepc(pc: Vec<RistrettoPoint>) -> io::Result<()>{
-    let mut file = File::create("pc.txt")?;
-    file.write_fmt(format_args!("{:?}", pc))?;
+// It write the public clue in a file.
+fn wexport(pc: Vec<RistrettoPoint>) -> io::Result<()>{
+    let mut vecpc : Vec<[u8;32]> = Vec::new();
+    for i in 0..pc.len(){
+    	vecpc.push((pc[i].compress()).to_bytes())
+    
+    }
+    let mut file = File::options().write(true).truncate(true).create(true).open("pc.txt")?;
+    for i in 0..vecpc.len(){
+    	file.write_vectored(&[IoSlice::new(&vecpc[i])])?;
+    }
     return Ok(())
 }
 
-pub fn writeproof(proof: &Proof) -> io::Result<()>{
-    let mut file = File::create("proof.txt")?;
-    file.write_fmt(format_args!("{:?}", proof))?;
+// It read the public clue located in a file.
+fn rexport() -> Vec<RistrettoPoint>{
+    let mut buffer = Vec::new();
+    let file = File::open("pc.txt"); 
+    let _ = file.expect("REASON").read_to_end(&mut buffer); 
+    let mut vecpc : Vec<[u8;32]> = Vec::new();
+    let mut array = [0u8;32];
+    for i in 0..buffer.len(){
+    	array[i%32] = buffer[i];
+    	
+    	if i % 32 == 31 && i>0{
+    		vecpc.push(array.clone());
+    	}
+    }
+    let mut pc : Vec<RistrettoPoint> = Vec::new();
+    for i in 0..vecpc.len(){
+    	pc.push(CompressedRistretto(vecpc[i]).decompress().unwrap());
+    }
+    return pc;   
+}	
+
+// It write the proof in a file.
+fn wexportproof(p: &Proof) -> io::Result<()>{
+    let mut vecproof : Vec<[u8;32]> = Vec::new();
+    let mut file = File::options().write(true).truncate(true).create(true).open("proof.txt")?;
+    match p{
+    	Proof::ProofMaybe{r_0, r_1, c_1, z_0, z_1} =>{
+    	    vecproof.push(((r_0).compress()).to_bytes());
+    	    for i in 0..r_1.len(){
+    	    	vecproof.push(((r_1[i]).compress()).to_bytes());	
+    	    }
+    	    for i in 0..c_1.len(){
+    	    	vecproof.push((c_1[i]).to_bytes());
+    	    }
+    	    vecproof.push((z_0).to_bytes());
+    	    for i in 0..z_1.len(){
+    	    	vecproof.push((z_1[i]).to_bytes());
+    	    }
+    	},
+    	Proof::ProofNo{y_0_p, y_1_p, r_0, r_r, s_0, s_s, u_u, v_v} =>{ 
+    	    vecproof.push(((y_0_p).compress()).to_bytes());
+    	    for i in 0..y_1_p.len(){
+    	    	vecproof.push(((y_1_p[i]).compress()).to_bytes());	
+    	    }
+    	    vecproof.push(((r_0).compress()).to_bytes());
+    	    for i in 0..r_r.len(){
+    	    	vecproof.push(((r_r[i]).compress()).to_bytes());	
+    	    }
+    	    vecproof.push(((s_0).compress()).to_bytes());
+    	    for i in 0..s_s.len(){
+    	    	vecproof.push(((s_s[i]).compress()).to_bytes());	
+    	    }
+    	    vecproof.push((u_u).to_bytes());  
+    	    vecproof.push((v_v).to_bytes()); 
+    	},
+    	&Proof::Error { .. } => todo!(),	
+    }
+    for i in 0..vecproof.len(){
+        file.write_vectored(&[IoSlice::new(&vecproof[i])])?;
+    }
     return Ok(())
+}
+
+// It read the proof located in a file.
+fn rexportproof(answer: usize, pj: Vec<RistrettoPoint>) -> Proof{
+    let len = pj.len()+2;
+    let mut buffer = Vec::new();
+    let file = File::open("proof.txt"); 
+    let _ = file.expect("REASON").read_to_end(&mut buffer); 
+    let mut vecp : Vec<[u8;32]> = Vec::new();
+    let mut array = [0u8;32];
+    for i in 0..buffer.len(){
+    	array[i%32] = buffer[i];
+    	
+    	if i % 32 == 31 && i>0{
+    		vecp.push(array.clone());
+    	}
+    }
+    if answer == 1{
+    	let mut r1 : Vec<RistrettoPoint> = Vec::new();
+    	let mut c1 : Vec<Scalar> = Vec::new();
+    	let mut z1 : Vec<Scalar> = Vec::new();
+    	let r0 = CompressedRistretto(vecp[0]).decompress().unwrap();
+        for i in 1..len+1{
+            r1.push(CompressedRistretto(vecp[i]).decompress().unwrap());
+        }
+        for i in len+1..2*len+1{
+            c1.push(Scalar::from_bytes_mod_order(vecp[i]));
+        }
+        let z0 = Scalar::from_bytes_mod_order(vecp[2*len+1]);
+        for i in 2*len+2..3*len+2{
+            z1.push(Scalar::from_bytes_mod_order(vecp[i]));
+        }
+        return Proof::ProofMaybe{r_0: r0, r_1: r1, c_1: c1, z_0: z0, z_1: z1}; 
+    }
+    
+    if answer == 0{
+    	let mut y1_p : Vec<RistrettoPoint> = Vec::new();
+    	let mut rr : Vec<RistrettoPoint> = Vec::new();
+    	let mut ss : Vec<RistrettoPoint> = Vec::new();
+    	let y0_p = CompressedRistretto(vecp[0]).decompress().unwrap();
+        for i in 1..len+1{
+            y1_p.push(CompressedRistretto(vecp[i]).decompress().unwrap());
+        }
+        let r0 = CompressedRistretto(vecp[len+1]).decompress().unwrap();
+        for i in len+2..2*len+2{
+            rr.push(CompressedRistretto(vecp[i]).decompress().unwrap());
+        }
+        let s0 = CompressedRistretto(vecp[2*len+2]).decompress().unwrap();
+        for i in 2*len+3..3*len+3{
+            ss.push(CompressedRistretto(vecp[i]).decompress().unwrap());
+        }
+        let uu = Scalar::from_bytes_mod_order(vecp[3*len+3]);
+        let vv = Scalar::from_bytes_mod_order(vecp[3*len+4]);
+        return Proof::ProofNo{y_0_p: y0_p, y_1_p: y1_p, r_0: r0, r_r: rr, s_0: s0, s_s: ss, u_u: uu, v_v: vv}; 
+    }
+    
+    return Proof::Error{err: false};      
 }
 
 // Algorithms for the CC2 scheme:
