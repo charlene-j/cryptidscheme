@@ -2,11 +2,15 @@ use rand::Rng;
 use rand_core::{CryptoRng, RngCore};
 use std::{time::Duration, time::Instant, io, io::Write, fs::File, fs};
 use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar, constants::RISTRETTO_BASEPOINT_POINT};
+use curve25519_dalek::ristretto::CompressedRistretto;
 use sha256::digest;
 use hex::FromHex;
+use std::io::Read;
+use std::io::IoSlice;
+
 
 // Definition of structure for the proof.
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub enum Proof{
 
     Proofplay{r_0: RistrettoPoint, r_1: RistrettoPoint, z_z: Scalar},
@@ -128,7 +132,9 @@ pub fn measurementscc1<T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoin
      
         let pc = keyc.0; // pc = (pk, c11, c21, c12, c22, ..., c1n, c2n) where n is the size of map.
         let sc = keyc.1; // sc = sk.
-        let _ = writepc((&pc).to_vec()); // It allows to write the public clue key in the file "pc.txt".
+        let _ = wexport((&pc).to_vec()); // It allows to write the public clue key in the file "pc.txt".
+        let newpc = rexport();
+        assert!(pc == newpc, "pc is not equal to pc in the file.");
     	let pcdata = fs::metadata("pc.txt"); 
     	pcsize += pcdata.expect("REASON").len(); // It allows to measures the size of the file "pc.txt". 
     	
@@ -150,7 +156,9 @@ pub fn measurementscc1<T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoin
             let proof = play(csprng, g0, (&a).to_vec(), (&pc).to_vec(), sc, j, answer);
             let playtime = startplay.elapsed();
             sumplay[k] += playtime;
-            let _ = writeproof(&proof);
+            let _ = wexportproof(&proof);
+            let newproof = rexportproof();
+            assert!(newproof == proof, "The proof in the file is not equal to the real proof");
     	    let proofdata = fs::metadata("proof.txt");
     	    proofsize[k] += proofdata.expect("REASON").len();
         
@@ -180,17 +188,79 @@ pub fn measurementscc1<T: CryptoRng + RngCore>(csprng: &mut T, g0: RistrettoPoin
 }
 
 // It write the public clue and the proof in a file.
-fn writepc(pc: Vec<RistrettoPoint>) -> io::Result<()>{
-    let mut file = File::create("pc.txt")?;
-    file.write_fmt(format_args!("{:?}",pc))?;
+fn wexport(pc: Vec<RistrettoPoint>) -> io::Result<()>{
+    let mut vecpc : Vec<[u8; 32]> = Vec::new();
+    for i in 0..pc.len(){
+    	vecpc.push((pc[i].compress()).to_bytes()); 
+    }
+    let mut file = File::options().write(true).truncate(true).create(true).open("pc.txt")?;
+    for i in 0..vecpc.len(){
+    	file.write_vectored( &[IoSlice::new(&vecpc[i])]  )?;
+    }
     return Ok(())
 }
 
-fn writeproof(proof: &Proof) -> io::Result<()>{
-    let mut file = File::create("proof.txt")?;
-    file.write_fmt(format_args!("{:?}", proof))?;
+// It read the public clue located in the file.
+fn rexport() -> Vec<RistrettoPoint>{
+    let mut buffer = Vec::new();
+    let file = File::open("pc.txt"); 
+    let _ = file.expect("REASON").read_to_end(&mut buffer); 
+    let mut vecpc : Vec<[u8; 32]> = Vec::new();
+    let mut array = [0u8; 32];
+    for i in 0..buffer.len(){
+    	array[i%32] = buffer[i];
+    	
+    	if i % 32 == 31 && i>0{
+    		vecpc.push(array.clone());
+    	}
+    }
+    let mut pc : Vec<RistrettoPoint> = Vec::new();
+    for i in 0..vecpc.len(){
+    	pc.push(CompressedRistretto(vecpc[i]).decompress().unwrap());
+    }
+    return pc;   
+}
+
+// It write the proof in a file.
+fn wexportproof(p: &Proof) -> io::Result<()>{
+    let mut vecproof : Vec<[u8; 32]> = Vec::new();
+    let mut file = File::options().write(true).truncate(true).create(true).open("proof.txt")?;
+    match p{
+    	Proof::Proofplay{r_0, r_1, z_z} =>{ 
+    	    vecproof.push(((r_0).compress()).to_bytes());
+    	    vecproof.push(((r_1).compress()).to_bytes());
+    	    vecproof.push((z_z).to_bytes());  
+    	},
+    	&Proof::Error { .. } => todo!(),	
+   }
+   for i in 0..vecproof.len(){
+      file.write_vectored( &[IoSlice::new(&vecproof[i])])?;
+    }
     return Ok(())
 }
+
+// It read the proof located in the file.
+fn rexportproof() -> Proof{
+    let mut buffer = Vec::new();
+    let file = File::open("proof.txt"); 
+    let _ = file.expect("REASON").read_to_end(&mut buffer); 
+    let mut vecp : Vec<[u8; 32]> = Vec::new();
+    let mut array = [0u8; 32];
+    for i in 0..buffer.len(){
+    	array[i%32] = buffer[i];
+    	
+    	if i % 32 == 31 && i>0{
+    		vecp.push(array.clone());
+    	}
+    }
+    let mut vecpoint : Vec<RistrettoPoint> = Vec::new();
+    for i in 0..2{
+    	vecpoint.push(CompressedRistretto(vecp[i]).decompress().unwrap());
+    }
+    let scalar = Scalar::from_bytes_mod_order(vecp[2]);
+    return Proof::Proofplay{ r_0: vecpoint[0], r_1: vecpoint[1], z_z: scalar};   
+}
+
  	   
 // Algorithms for CC1:
 // GenClue:
